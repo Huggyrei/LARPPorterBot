@@ -12,4 +12,4 @@ client.on('message', msg => {
     gameManager.msgHandler(msg, client.user.id);
  });
 
-client.login('xxx');
+client.login('BOTID');

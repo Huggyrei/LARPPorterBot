@@ -1,0 +1,10 @@
+ItemName,Heading,Visible,Text
+Map,Description,TRUE,This is a map of an island with an X on the tallest cliff on the East side
+Map,Rum,FALSE,"The X is a fake. When you hold it up to a bright light, you see the translucent mark of the real X, on the side of the Gloomy Pond on the Northwest of the island"
+Fairydust,Description,TRUE,Glittering gold dust wrapped in a handkerchief
+TopHat,Description,TRUE,"A rather dapper top hat. Whatever size you are, the hat is just slightly too big."
+Bottle,Description,TRUE,A bottle of medicine
+Bottle,Rum,FALSE,This is a bottle of poison!
+Flag,Description,TRUE,A flag with a skull and crossbones on it
+Chest,Description,TRUE,A locked chest
+Chest,Rum,FALSE,The key to this chest is kept in Captain Hook's cabinet
