@@ -1,29 +1,20 @@
 "use strict";
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 module.exports = class Item{
-    constructor(name, mainChannel, utility){
-        this.nameID=name;   this.infos=[];  this.channel=mainChannel;   this.utility=utility;
-    }
-    async setup(msg){
-        this.infos=[];
-        await this.utility.readFile(msg, './csvs/' + this.nameID + '.csv', this.initFile, this, [msg], false);
+    constructor(name, utility){
+        this.nameID=name;   this.infos=[];  this.utility=utility;
     }
     loadFileData(msg, jsonIn){
-        this.initFile(msg, [jsonIn]); 
-    }
-    async initFile(msg, fileData){
-        for(var i=0;i<fileData.length;i++) { 
-            var infoItem=this.processJson(fileData[i]);
-            var newName=this.findValidName(infoItem.heading,0);
-            if(newName!==infoItem.heading){
-                this.utility.sendMsg(msg.channel, "WARNING: Multiple entries found for info " + infoItem.heading + " or info heading invalid for item " + this.nameID + "; will create new info item under name " + newName);
-                infoItem.heading=newName;
-            }
-            this.infos.push(infoItem);
+        var infoItem=this.processJson(jsonIn);
+        var newName=this.findValidName(infoItem.heading,0);
+        if(newName!==infoItem.heading){
+            this.utility.sendMsg(msg.channel, "WARNING: Multiple entries found for info " + infoItem.heading + " or info heading invalid for item " + this.nameID + "; will create new info item under name " + newName);
+            infoItem.heading=newName;
         }
+        this.infos.push(infoItem);
     }
     processJson(dataItem){
-        var infoItem={heading:"", visible:true, "text": ""};
+        var infoItem={heading:"", visible:true, text: ""};
         for(var jObj in dataItem){
             switch(jObj.toLowerCase()){
                 case 'name': case 'title': case 'heading': case 'section': infoItem.heading=dataItem[jObj]; break;
@@ -46,19 +37,14 @@ module.exports = class Item{
         else{return this.findValidName(newName, count+1);}
     }
 
-    view(msg, heading, gmFlag){
-        var msgContent="**"+this.nameID+"**";
-        if(heading==="all" || heading===""){
-            for(var i=0;i<this.infos.length;i++){
-                if(gmFlag || this.infos[i].visible) {msgContent = msgContent + "\n*" + this.infos[i].heading + (gmFlag ? " [Visible: " + this.infos[i].visible + "]" : "") +  "*: "+this.infos[i].text;}
-            }
+    view(msg, itemCodes, showPublic, gmFlag, channel, returnMsg){
+        if(!channel){if(msg){channel=msg.channel;}}
+        var msgContent="";
+        for(var i=0;i<this.infos.length;i++){
+            if(gmFlag || this.infos[i].visible && showPublic || itemCodes.find(x=>x.toLowerCase()===this.infos[i].heading.toLowerCase())) {msgContent = msgContent + "\n*" + this.infos[i].heading + (gmFlag ? " [Visible: " + this.infos[i].visible + "]" : "") +  "*: "+this.infos[i].text;}
         }
-        else{
-            var infoItem=this.infos.find(x=>x.heading.toLowerCase()===heading.toLowerCase());
-            if(infoItem===undefined){msgContent = msgContent + " - No information found";}
-            else{msgContent = msgContent + " - *" + infoItem.heading + "*: " + infoItem.text;}
-        }
-        this.utility.sendMsg(msg.channel,msgContent);
+        msgContent="**"+this.nameID+"**" + (msgContent==="" ? " - No information found" : msgContent);
+        if(returnMsg){return msgContent;} else {this.utility.sendMsg(channel,msgContent);}
     }
 
     //GM only edit commands
@@ -70,6 +56,7 @@ module.exports = class Item{
     renameInfo(msg, msgInfo2, msgInfo3){
         var info=this.infos.find(x=>x.heading.toLowerCase()===msgInfo2.toLowerCase());
         if(info===undefined){this.utility.sendMsg(msg.channel,"Info type " + msgInfo2 + " for item " + this.nameID + " not found"); return;}
+        if(this.infos.find(x=>x.heading.toLowerCase()===msgInfo3.toLowerCase())){this.utility.sendMsg(msg.channel,"ERROR: This item already has some info with that heading associated with it"); return;}
         info.heading = msgInfo3;
         this.utility.sendMsg(msg.channel,"Info header changed from " + msgInfo2 + " to " + msgInfo3);
     }
@@ -94,18 +81,18 @@ module.exports = class Item{
     }
     addInfo(msg, msgInfo2, msgInfo3, msgInfo4){
         if(msgInfo2===""){this.utility.sendMsg(msg.channel,"ERROR: cannot add info with no header"); return;}
-        if(this.infos.find(x=>x.heading===msgInfo2)){this.utility.sendMsg(msg.channel,"ERROR: This item already has some info with that heading associated with it"); return;}
+        if(this.infos.find(x=>x.heading.toLowerCase()===msgInfo2.toLowerCase())){this.utility.sendMsg(msg.channel,"ERROR: This item already has some info with that heading associated with it"); return;}
         var firstChar = msgInfo3.toLowerCase().substring(0,1);
         this.infos.push({heading: msgInfo2, visible:(firstChar==="y"||firstChar==="t")?true:false, "text": msgInfo4});
         this.utility.sendMsg(msg.channel,"New info type " + msgInfo2 + " added for item " + this.nameID);
     }
-    async save(msg){
-        try{
-            var csvWriter = createCsvWriter({path: './csvs/' + this.nameID + '.csv',
-                header: [{id: 'heading', title: "Heading"}, {id: 'visible', title: "Visible"}, {id: 'text', title: "Text"}]
-            });
-            await csvWriter.writeRecords(this.infos).then(()=> this.utility.sendMsg(msg.channel,"Item " + this.nameID + " saved to csv file"));
-        }catch{this.utility.sendMsg(msg.channel,"ERROR: Could not save item to "+ this.nameID + ".csv, do you have it open?");}
+    save(){
+        var returnSave=[];
+        for(var i=0;i<this.infos.length;i++){
+            var info=this.infos[i];
+            returnSave.push({itemname: this.nameID, heading:info.heading, visible:info.visible, text: info.text});
+        }
+        return returnSave;
     }
 }
 

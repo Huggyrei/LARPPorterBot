@@ -5,9 +5,9 @@ const Help= require('./help.js');               const Utility = require("./utili
 
 module.exports = class GameManager{
     constructor(){
-        this.initialised=false; this.GMChannel=undefined;   this.parObj=undefined;  this.GMRoleID=undefined;
-        this.guild=undefined;   this.clientID=undefined;    this.prefix="_";        this.characters=[];
-        this.locations=[];      this.utility=new Utility(); this.running=false;
+        this.initialised=false;     this.GMChannel=undefined;   this.charparObj=undefined;  this.locparObj=undefined;
+        this.GMRoleID=undefined;    this.guild=undefined;       this.clientID=undefined;    this.prefix="_";
+        this.characters=[];         this.locations=[];          this.utility=new Utility(); this.running=false;
     }
     msgHandler(msg, clientID){
         if(msg.content.toLowerCase().startsWith(this.prefix.toLowerCase())&&(msg.guild===this.guild||this.initialised===false))
@@ -34,8 +34,13 @@ module.exports = class GameManager{
                 case 'msg': this.sendCharMsg(msg, msgInfo1, msgInfo2 + " " + msgInfo3 + " " + msgInfo4); break;
                 case 'view': case 'inventory': case 'items': case 'examine' : case 'look': this.view(msg, msgInfo1, msgInfo2, msgInfo3); break;
                 case 'show' : case 'lend': this.show(msg, msgInfo1, msgInfo2, msgInfo3); break;
-                case 'give': case 'move': this.give(msg, msgInfo1, msgInfo2, msgInfo3); break;
+                case 'give': case 'moveitem': this.give(msg, msgInfo1, msgInfo2, msgInfo3); break;
                 case 'pay': this.pay(msg, msgInfo1, msgInfo2, msgInfo3); break;
+                case 'steal': this.steal(msg, msgInfo1, msgInfo2); break;
+                case 'move': case 'go': this.move(msg, msgInfo1, msgInfo2); break
+                case 'leave': this.leave(msg, msgInfo1); break;
+                case 'take': this.take(msg, msgInfo1, msgInfo2); break;
+                case 'drop': this.drop(msg, msgInfo1, msgInfo2); break;
 
                 case 'find': this.findItem(msg, msgInfo1); break;
                 case 'addchar': case 'newchar': this.addChar(msg, msgInfo1); break;
@@ -45,27 +50,29 @@ module.exports = class GameManager{
                 case 'delete': this.removeCheck(msg, msgInfo1); break;
                 case 'deleteinfo': this.deleteInfo(msg, msgInfo1, msgInfo2); break;
                 case 'rename': this.renameID(msg, msgInfo1, msgInfo2); break;
-                case 'nickname': this.renameNickname(msg, msgInfo1, msgInfo2 + (msgInfo3==="",""," " + msgInfo3) + (msgInfo4==="",""," " + msgInfo4)); break;
+                case 'nickname': this.renameNickname(msg, msgInfo1, msgInfo2 + (msgInfo3==="",""," " + msgInfo3) + (msgInfo4==="",""," " + msgInfo4), false); break;
+                case 'description': this.renameNickname(msg, msgInfo1, msgInfo2 + (msgInfo3==="",""," " + msgInfo3) + (msgInfo4==="",""," " + msgInfo4), true); break;
                 case 'cash': case 'money': this.changeCash(msg, msgInfo1, msgInfo2); break;
+                case 'prevent': this.changePrevent(msg, msgInfo1, msgInfo2); break;
                 case 'renameinfo': this.renameInfo(msg, msgInfo1, msgInfo2, msgInfo3); break;
-                case 'visiblility': case 'visible': this.editVisible(msg, msgInfo1, msgInfo2, msgInfo3); break;
-                case 'editinfo': case 'text': case 'detail': this.editText(msg, msgInfo1, msgInfo2, msgInfo3) + (msgInfo4==="",""," " + msgInfo4); break;
+                case 'visibility': case 'visible': this.editVisible(msg, msgInfo1, msgInfo2, msgInfo3); break;
+                case 'editinfo': case 'text': case 'detail': this.editText(msg, msgInfo1, msgInfo2, msgInfo3 + (msgInfo4==="",""," " + msgInfo4)); break;
+                case 'codes': this.viewCodes(msg, msgInfo1); break;
+                case 'addcode': this.addCode(msg, msgInfo1, msgInfo2); break;
+                case 'deletecode': this.deleteCode(msg, msgInfo1, msgInfo2); break;
             }
         }
     }
     getHelp(msg, msgInfo1){
-        this.utility.sendMsg(msg.channel,  Help.makeHelpText1(this.prefix));
-        if(msgInfo1.toLowerCase()==="gm") {
-            this.utility.sendMsg(msg.channel,  Help.makeHelpText2(this.prefix));
-            this.utility.sendMsg(msg.channel,  Help.makeHelpText3(this.prefix));
+        if(msgInfo1===""){this.utility.sendMsg(msg.channel,  Help.makeHelpText1(this.prefix));}
+        if(msgInfo1.toLowerCase()==="gm"){this.utility.sendMsg(msg.channel,  Help.makeHelpText2(this.prefix));}
+        if(msgInfo1.toLowerCase()==="edit"){this.utility.sendMsg(msg.channel,  Help.makeHelpText3(this.prefix));
         }
     }
     setPrefix(msg, newPrefix){
-        if(msg.member===undefined){this.utility.sendMsg(msg.channel,"ERROR: I can't work out which server you're on"); return;}
-        if(msg.member.roles.cache.find(r => r.name === "GM")){
-            this.prefix=newPrefix;
-            this.utility.sendMsg(msg.channel,"Prefix changed")
-        }else{this.utility.sendMsg(msg.channel,"Error: You need a GM role to change the prefix");}
+        if(!this.checks(msg, false,false, true, true,false)){return;}
+        this.prefix=newPrefix;
+        this.utility.sendMsg(msg.channel,"Prefix changed")
     }
     checks(msg, checkInitialised, checkRunning, checkNotRunning, checkGM, allowPlayer){
         if(this.initialised===false && checkInitialised){this.utility.sendMsg(msg.channel,"ERROR: Bot is not initialised"); return false;}
@@ -102,7 +109,7 @@ module.exports = class GameManager{
         if(this.checks(msg, false, false, true, true, false)===false){return;}
         if(this.initialised){
             var warningContent = "Are you sure you want to rebuild? This will destroy the current setup. If you want to keep it use the save command first. Type y to confirm the rebuild or anything else to cancel";
-            this.utility.checkMessage(msg, warningContent, "Rebuild Cancelled", this.setup, this, [msg, clientID]);
+            this.utility.checkMessage(msg.channel, msg.author.id, warningContent, "Rebuild Cancelled", this.setup, this, [msg, clientID]);
         }
         else{this.setup(msg, clientID);}
     }
@@ -113,67 +120,123 @@ module.exports = class GameManager{
         this.clientID=clientID;     this.guild=msg.guild;   this.GMChannel=msg.channel; 
         this.utility.setChannel(this.GMChannel);
         if(!this.guild.me.hasPermission("MANAGE_CHANNELS")){this.utility.sendMsg(msg.channel,"WARNING: I can't create channels as I don't have the 'Manage Channels' permission"); }
+        if(!this.guild.me.hasPermission("MANAGE_ROLES")){this.utility.sendMsg(msg.channel,"WARNING: I can't add people to private channel access as I don't have the 'Manage Roles' permission"); }
         if(!this.guild.me.hasPermission("MANAGE_NICKNAMES")){this.utility.sendMsg(msg.channel,"WARNING: I can't name people according to their characters; I don't have the 'Manage Nicknames' permission");}
-        this.parObj = this.guild.channels.cache.find(c => c.name == "GM" && c.type == "category");
-        if(this.parObj===undefined){try{this.parObj= await this.guild.channels.create("GM",{ type: 'category' });}catch{};}
+        if(!this.guild.me.hasPermission("MANAGE_MESSAGES")){this.utility.sendMsg(msg.channel,"WARNING: I can't delete old information in location channels; I don't have the 'Manage Messages' permission");}
+        this.charparObj = this.guild.channels.cache.find(c => c.name == "Characters" && c.type == "category");
+        if(this.charparObj===undefined){try{this.charparObj= await this.guild.channels.create("Characters",{ type: 'category' });}catch{};}
+        this.locparObj = this.guild.channels.cache.find(c => c.name == "Locations" && c.type == "category");
+        if(this.locparObj===undefined){try{this.locparObj= await this.guild.channels.create("Locations",{ type: 'category' });}catch{};}
         this.utility.readFile(msg, './csvs/characters.csv', this.initCharacters,this,[msg], true);
     }
     initCharacters(msg, fileData){
-        for(var i=0;i<fileData.length;i++) { 
-            this.characters.push(new Character(fileData[i],this.guild, i, this.parObj, this.clientID, this.GMRoleID, this.GMChannel, this.utility, msg));
+        if(fileData.length>0){
+            if(!fileData[0].hasOwnProperty('Name')){this.utility.sendMsg(msg.channel, "ERROR: Cannot find 'Name' field for characters.csv");}
+            else{
+                for(var i=0;i<fileData.length;i++) { 
+                    var charName=fileData[i]['Name'];
+                    if(this.nameExists(charName)){
+                        var newName=this.findValidName(charName);
+                        this.utility.sendMsg(msg.channel, "WARNING: " + charName + " is not a unique naming. Renaming this character as " + newName);
+                        fileData[i]['Name'] =newName;
+                    }
+                    this.characters.push(new Character(fileData[i], false, this.guild, i, this.charparObj, this.clientID, this.GMRoleID, this.utility, msg));
+                }
+            }
         }
         this.utility.readFile(msg, './csvs/locations.csv', this.initLocations,this,[msg], true);
     }
     async initLocations(msg, fileData){
-        for(var i=0;i<fileData.length;i++) { 
-            this.locations.push(new Character(fileData[i], this.guild, i, this.parObj, this.clientID, this.GMRoleID, this.GMChannel, this.utility, msg));
+        if(fileData.length>0){
+            if(!fileData[0].hasOwnProperty('Name')){this.utility.sendMsg(msg.channel, "ERROR: Cannot find 'Name' field for locations.csv");}
+            else{
+                for(var i=0;i<fileData.length;i++) { 
+                    var locName=fileData[i]['Name'];
+                    if(this.nameExists(locName)){
+                        var newName=this.findValidName(locName);
+                        this.utility.sendMsg(msg.channel, "WARNING: " + locName + " is not a unique naming. Renaming this location as " + newName);
+                        fileData[i]['Name'] =newName;
+                    }
+                    this.locations.push(new Character(fileData[i], true, this.guild, i, this.locparObj, this.clientID, this.GMRoleID, this.utility, msg));
+                }
+            }
         }
         this.utility.readFile(msg, './csvs/items.csv', this.initItemsList,this,[msg], false);
     }
     async initItemsList(msg, fileData){
+        if(fileData.length>0){
+            if(!fileData[0].hasOwnProperty('ItemName')){this.utility.sendMsg(msg.channel, "ERROR: Cannot find ItemName field for items.csv");}
+            else{
+                for(var i=0;i<fileData.length;i++) {
+                    var itemName=fileData[i].ItemName;
+                    var findObj = this.findObject(itemName, false, false, true, true);
+                    if(findObj===undefined){
+                        this.utility.sendMsg(msg.channel,"ERROR: Cannot find item " + itemName + ", adding it to default location 'GM'");
+                        var locObj=this.locations.find(x=>x.nameID.toLowerCase()==="gm");
+                        if(locObj===undefined){
+                            locObj = new Character({name: "GM", cash: 0}, true, this.guild, this.locations.length, this.locparObj, this.clientID, this.GMRoleID, this.utility,msg);
+                            this.locations.push(locObj);
+                        }
+                        await locObj.addItem(msg, itemName);
+                        findObj=locObj.items.find(x=>x.nameID.toLowerCase()===itemName.toLowerCase());
+                    }
+                    findObj.loadFileData(msg, fileData[i]);
+                }
+            }
+        }
+        this.checkInitialisation(msg);
+    }
+    checkInitialisation(msg){
+        var msgContent="";
+        var msgContent2="";
         for(var i=0;i<this.characters.length;i++){
-            await this.checkCharInitialised(this.characters[i]);
+            var items=this.characters[i].items;
+            for(var j=0;j<items.length;j++){
+                var itName=items[j].nameID;
+                if(this.nameExists(itName, true)){
+                    var newName=this.findValidName(itName);
+                    this.utility.sendMsg(msg.channel, "WARNING: " + itName + " is not a unique naming. Renaming this item as " + newName);
+                    items[j].nameID=newName;
+                }
+                if(items[j].infos.length===0){msgContent=msgContent + "\n" + items[j].nameID;}
+            }
+            var codes=this.characters[i].itemCodes;
+            for(var j=0;j<codes.length;j++){
+                var code=codes[j].toLowerCase();
+                var findObj=this.characters.find(x=>x.items.find(y=>y.infos.find(z=>z.heading.toLowerCase()===code)));
+                if(findObj===undefined){findObj=this.locations.find(x=>x.items.find(y=>y.infos.find(z=>z.heading.toLowerCase()===code)));}
+                if(findObj===undefined){msgContent2=msgContent2 + "\n" + this.characters[i].nameID + ": " + codes[j];}
+            }
         }
         for(var i=0;i<this.locations.length;i++){
-            await this.checkCharInitialised(this.characters[i]);
-        }
-        for(var i=0;i<fileData.length;i++) {
-            if(!fileData[i].hasOwnProperty('ItemName')){this.utility.sendMsg(msg.channel, "ERROR: Cannot find ItemName field for items.csv"); break;}
-            var itemName=fileData[i].ItemName;
-            var findObj = this.findObject(itemName, false, false, true, true);
-            if(findObj===undefined){
-                this.utility.sendMsg(msg.channel,"ERROR: Cannot find item " + itemName + ", adding it to default location 'GM'");
-                var locObj=this.locations.find(x=>x.nameID.toLowerCase()==="gm");
-                if(locObj===undefined){
-                    locObj = new Character({name: "GM", cash: 0}, this.guild, this.locations.length, this.parObj, this.clientID, this.GMRoleID, this.GMChannel, this.utility,msg);
-                    this.locations.push(locObj);
+            var items=this.locations[i].items;
+            for(var j=0;j<items.length;j++){
+                var itName=items[j].nameID;
+                if(this.nameExists(itName, true)){
+                    var newName=this.findValidName(itName);
+                    this.utility.sendMsg(msg.channel, "WARNING: " + itName + " is not a unique naming. Renaming this item as " + newName);
+                    items[j].nameID=newName;
                 }
-                await locObj.addItem(msg, itemName);
-                findObj=locObj.items.find(x=>x.nameID.toLowerCase()===itemName.toLowerCase());
+                if(items[j].infos.length===0){msgContent=msgContent + "\n" + items[j].nameID;}
             }
-            findObj.loadFileData(msg, fileData[i]);
         }
+        if(msgContent!==""){this.utility.sendMsg(msg.channel,"WARNING: The following items have no associated information:" +msgContent);}
+        if(msgContent2!=""){this.utility.sendMsg(msg.channel, "WARNING: The following characters have information codes that do not match any item information:" + msgContent2);}
         this.initialised=true;      this.utility.sendMsg(msg.channel,"Bot initialised. GM messages will be sent to this channel."); 
     }
-    async checkCharInitialised(char, count){
-        if(count===undefined){count=20;}
-        if(char.initialised){return true;}
-        if(count=0){return false;}
-        return await setTimeout(async ()=> {try{return await this.checkCharInitialised(char, count-1)}catch{}}, 100);
-    }
     run(msg){
-        if(this.checks(msg, true, false, false, true, false)===false){return;}
+        if(this.checks(msg, true, false, true, true, false)===false){return;}
         for(var i=0;i<this.characters.length;i++){
-            this.characters[i].run();
+            this.characters[i].run(msg);
         }
         for(var i=0;i<this.locations.length;i++){
-            this.locations[i].run();
+            this.locations[i].run(msg);
         }
         this.running=true;
         this.utility.sendMsg(msg.channel,"Bot is running. Players can now claim characters");
     }
     stop(msg){
-        if(this.checks(msg, true, false, false, true, false)===false){return;}
+        if(this.checks(msg, true, true, false, true, false)===false){return;}
         for(var i=0;i<this.characters.length;i++){
             this.characters[i].stop(msg);
         }
@@ -200,14 +263,36 @@ module.exports = class GameManager{
         if(this.characters.find(x=>x.userID===msg.author.id)){this.utility.sendMsg(msg.channel,"ERROR: You already have a character!"); return;}
         var char = this.findObject(msgInfo, true, false, false, false);
         if(char===undefined){this.utility.sendMsg(msg.channel,"Character cannot be found"); return;}
-        char.claim(msg);
+        char.claim(msg, msg.member.id);
     }
     releaseCharacter(msg, msgInfo1){
         var char = this.checks(msg, true, false, false, true, true);
         if(char===false){return;}
         if(char===true){char=this.findObject(msgInfo1, true, false, false, false);}
         if(char===undefined) {this.utility.sendMsg(msg.channel,"Character cannot be found"); return;}
-        char.release(msg);
+        if(char.userID===undefined){this.utility.sendMsg(msg.channel, "Character has not been claimed"); return;}
+        char.release(msg, char.userID);
+    }
+    move(msg, msgInfo1, msgInfo2){
+        var findObj=this.checks(msg, true, false, false, true, true);
+        if(findObj===false){return;}
+        if(findObj===true){
+            findObj=this.findObject(msgInfo1, true, false, false, false);
+            if(findObj===undefined){this.utility.sendMsg(msg.channel, "Error: Canot find character " + msgInfo1); return;}
+            msgInfo1=msgInfo2;
+        }
+        var loc=this.findObject(msgInfo1, false, true, false, false);
+        if(loc===undefined){this.utility.sendMsg(msg.channel, "Error: Canot find location " + msgInfo1); return;}
+        findObj.move(msg, loc);
+    }
+    leave(msg, msgInfo1){
+        var findObj=this.checks(msg, true, false, false, true, true);
+        if(findObj===false){return;}
+        if(findObj===true){
+            findObj=this.findObject(msgInfo1, true, false, false, false);
+            if(findObj===undefined){this.utility.sendMsg(msg.channel, "Error: Canot find character " + msgInfo1); return;}
+        }
+        findObj.leave(msg);
     }
     view(msg, msgInfo1, msgInfo2, msgInfo3){
         var findObj = this.checks(msg, true, false, false, true, true);
@@ -216,16 +301,18 @@ module.exports = class GameManager{
             if(msgInfo1==="" ){this.viewChars(msg,true); return;}
             if(msgInfo1.toLowerCase()==="all"){
                 for(var i=0;i<this.characters.length;i++){
+                    this.utility.sendMsg(msg.channel,"**"+ this.characters[i].nameID +" :**");
                     this.characters[i].view(msg, "all", msgInfo2, true);
                 }
                 for(var i=0;i<this.locations.length;i++){
+                    this.utility.sendMsg(msg.channel,"**"+ this.locations[i].nameID +" :**");
                     this.locations[i].view(msg, "all", msgInfo2, true);
                 }
                 return;
             }
             findObj = this.findObject(msgInfo1, true, true, true, true);
             if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Specified character, location, or item not found"); return;}
-            if(findObj instanceof Item){findObj.view(msg, msgInfo2,msgInfo2.toLowerCase()==="all");}else{findObj.view(msg, msgInfo2, msgInfo3, true)}
+            if(findObj instanceof Item){findObj.view(msg, [msgInfo2],msgInfo2.toLowerCase()==="all" || msgInfo2==="",msgInfo2.toLowerCase()==="all");}else{findObj.view(msg, msgInfo2, msgInfo3, true)}
         }
         else{findObj.view(msg, msgInfo1, msgInfo2, false);}
     }
@@ -236,7 +323,7 @@ module.exports = class GameManager{
             for(var i=0;i<this.characters.length;i++){
                 var char=this.characters[i];
                 if(gmFlag || char.userID!==undefined) {
-                    msgContent = msgContent + "\n**ID Name: **" + char.nameID + "   **Nickname:**  " + char.charName +(gmFlag ? (char.userID===undefined ? "*(unclaimed)*" : "*(claimed)*") : "");
+                    msgContent = msgContent + "\n**ID Name: **" + char.nameID + "   **Nickname:**  " + char.description +(gmFlag ? (char.userID===undefined ? "*(unclaimed)*" : "*(claimed)*") : "");
                 }
             }
             this.utility.sendMsg(msg.channel,msgContent);
@@ -266,20 +353,50 @@ module.exports = class GameManager{
     give(msg, msgInfo1, msgInfo2, msgInfo3){
         var findObj = this.checks(msg, true, false, false, true, true);
         if(findObj===false){return;}
+        var char2=undefined;
         if(findObj===true){
             findObj=this.findObject(msgInfo1, true, true, true, false);
             if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Specified character, location, or item not found"); return;}
             if(findObj.nameID.toLowerCase()!==msgInfo1.toLowerCase()){msgInfo3=msgInfo1;}   msgInfo1=msgInfo2;  msgInfo2=msgInfo3;
+            char2=this.findObject(msgInfo1, true, true, false, false);
         }
-        var char2=this.findObject(msgInfo1, true, true, false, false);
+        else{char2=this.findObject(msgInfo1, true, false, false, false);}
         if(char2===undefined){this.utility.sendMsg(msg.channel,"Cannot find the character to give the item to"); return;}
-        findObj.give(msg, char2, msgInfo2);
+        findObj.give(msg, char2, msgInfo2, false);
+    }
+    take(msg, msgInfo1, msgInfo2){
+        var findObj = this.checks(msg, true, false, false, true, true);
+        if(findObj===false){return;}
+        if(findObj===true){
+            findObj=this.findObject(msgInfo1, true, false, false, false);
+            if(findObj===undefined){this.utility.sendMsg(msg.channel, "Error: Canot find character " + msgInfo1); return;}
+            msgInfo1=msgInfo2;
+        }
+        findObj.take(msg, msgInfo1);
+    }
+    drop(msg, msgInfo1, msgInfo2){
+        var findObj = this.checks(msg, true, false, false, true, true);
+        if(findObj===false){return;}
+        if(findObj===true){
+            findObj=this.findObject(msgInfo1, true, false, false, false);
+            if(findObj===undefined){this.utility.sendMsg(msg.channel, "Error: Canot find character " + msgInfo1); return;}
+            msgInfo1=msgInfo2;
+        }
+        findObj.drop(msg, msgInfo1);
+    }
+    steal(msg, msgInfo1, msgInfo2){
+        var findObj = this.checks(msg, true, false, false, true, true);
+        if(findObj===false){return;}
+        if(findObj==true){this.changeSteal(msg, msgInfo1, msgInfo2); return; }
+        var char2=this.findObject(msgInfo1, true, false, false, false);
+        if(char2===undefined){this.utility.sendMsg(msg.channel,"Cannot find the character you're stealing from"); return;}
+        findObj.steal(msg, char2, msgInfo2);
     }
     pay(msg, msgInfo1, msgInfo2, msgInfo3){
         var findObj = this.checks(msg, true, false, false, true, true);
         if(findObj===false){return;}
         if(findObj===true){
-            findObj=this.findObject(msgInfo1, true, true, true, false);
+            findObj=this.findObject(msgInfo1, true, true, false, false);
             if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Specified character, location, or item not found"); return;}
             if(findObj.nameID.toLowerCase()!==msgInfo1.toLowerCase()){msgInfo3=msgInfo1;}   msgInfo1=msgInfo2;  msgInfo2=msgInfo3;
         }
@@ -292,25 +409,29 @@ module.exports = class GameManager{
     findItem(msg, msgInfo1){
         if(this.checks(msg, true, false, false, true, false)===false){return;}
         var findObj=this.findObject(msgInfo1, false, false, true, false);
-        if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Specified item not found"); return;}
-        this.utility.sendMsg(msg.channel, findObj.charName + " has item " + msgInfo1);
+        if(findObj===undefined){
+            findObj = this.findObject(msgInfo1, true, false, false, false);
+            if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Specified item or character not found"); return;}
+            var loc=findObj.location;
+            this.utility.sendMsg(msg.channel, msgInfo1 +  (loc===undefined ? " is not in a location" : " is in location " + loc.nameID));
+        }else{this.utility.sendMsg(msg.channel, findObj.nameID + " has item " + msgInfo1);}
     }
     addChar(msg, msgInfo){
         if(this.checks(msg, true, false, false, true, false)===false){return;}
         if(this.nameExists(msgInfo)){this.utility.sendMsg(msg.channel,"ERROR: Name already exists or is invalid"); return;}
-        this.characters.push(new Character({name: msgInfo, cash: 0}, this.guild, this.characters.length, this.parObj, this.clientID, this.GMRoleID, this.GMChannel, this.utility, msg));
+        this.characters.push(new Character({name: msgInfo, cash: 0}, false, this.guild, this.characters.length, this.charparObj, this.clientID, this.GMRoleID, this.utility, msg));
         this.utility.sendMsg(msg.channel,"New character " + msgInfo + " created");
     }
     addLoc(msg, msgInfo){
         if(this.checks(msg, true, false, false, true, false)===false){return;}
         if(this.nameExists(msgInfo)){this.utility.sendMsg(msg.channel,"ERROR: Name already exists or is invalid"); return;}
-        this.locations.push(new Character({name: msgInfo, cash: 0}, this.guild, this.locations.length, this.parObj, this.clientID, this.GMRoleID, this.GMChannel,  this.utility, msg));
-        this.utility.sendMsg(msg.channel,"New character " + msgInfo + " created");
+        this.locations.push(new Character({name: msgInfo, cash: 0}, true, this.guild, this.locations.length, this.locparObj, this.clientID, this.GMRoleID, this.utility, msg));
+        this.utility.sendMsg(msg.channel,"New location " + msgInfo + " created");
     }
     removeCheck(msg, msgInfo){
         if(this.checks(msg, true, false, false, true, false)===false){return;}
         var warningContent = "Are you sure you want to delete " + msgInfo + " (and any items they have)? Type y to confirm or anything else to cancel";
-        this.utility.checkMessage(msg, warningContent, "Deletion Cancelled", this.remove,this,[msg, msgInfo]);
+        this.utility.checkMessage(msg.channel, msg.author.id, warningContent, "Deletion Cancelled", this.remove,this,[msg, msgInfo]);
     }
     remove(msg, msgInfo1){
         var findObj = this.findObject(msgInfo1,true, true, true, false);
@@ -331,10 +452,10 @@ module.exports = class GameManager{
         if(this.nameExists(msgInfo2)){this.utility.sendMsg(msg.channel,"ERROR: Name already exists or is not valid"); return;}
         findObj.renameID(msg, msgInfo2);
     }
-    renameNickname(msg, msgInfo1, msgInfo2){
+    renameNickname(msg, msgInfo1, msgInfo2, locationTrue){
         if(this.checks(msg, true, false, false, true, false)===false){return;}
-        var findObj = this.findObject(msgInfo1, true, false, false, false);
-        if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Cannot find character  " + msgInfo1); return;}
+        var findObj = this.findObject(msgInfo1, !locationTrue, locationTrue, false, false);
+        if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Cannot find " + (locationTrue? "location " : "character  ") + msgInfo1); return;}
         findObj.renameNickname(msg, msgInfo2);
     }
     addItem(msg, msgInfo1, msgInfo2){
@@ -349,6 +470,18 @@ module.exports = class GameManager{
         var findObj = this.findObject(msgInfo1, true, true, false,false);
         if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Cannot find character or location " + msgInfo1); return;}
         findObj.changeCash(msg, msgInfo2);
+    }
+    changeSteal(msg, msgInfo1, msgInfo2){
+        if(this.checks(msg, true, false, false, true, false)===false){return;}
+        var findObj = this.findObject(msgInfo1, true, false, false,false);
+        if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Cannot find character " + msgInfo1); return;}
+        findObj.changeSteal(msg, msgInfo2);
+    }
+    changePrevent(msg, msgInfo1, msgInfo2){
+        if(this.checks(msg, true, false, false, true, false)===false){return;}
+        var findObj = this.findObject(msgInfo1, true, false, false,false);
+        if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Cannot find character " + msgInfo1); return;}
+        findObj.changePrevent(msg, msgInfo2);
     }
     renameInfo(msg, msgInfo1, msgInfo2, msgInfo3){
         if(this.checks(msg, true, false, false, true, false)===false){return;}
@@ -381,52 +514,118 @@ module.exports = class GameManager{
         if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Cannot find item " + msgInfo1);return;}
         findObj.addInfo(msg, msgInfo2, msgInfo3, msgInfo4);
     }
+    viewCodes(msg, msgInfo1){
+        var findObj=this.checks(msg, true, false, false, true, true);
+        if(findObj===false){return;}
+        if(findObj===true){
+            var findObj=this.findObject(msgInfo1, true, false, false, false);
+            if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Cannot find character " + msgInfo1);return;}
+        }
+        findObj.viewCodes(msg);
+    }
+    deleteCode(msg, msgInfo1, msgInfo2){
+        if(!this.checks(msg, true, false, false, true, false)){return;}
+        var findObj=this.findObject(msgInfo1, true, false, false, false);
+        if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Cannot find character " + msgInfo1);return;}
+        findObj.deleteCode(msg, msgInfo2);
+    }
+    addCode(msg, msgInfo1, msgInfo2){
+        if(!this.checks(msg, true, false, false, true, false)){return;}
+        var findObj=this.findObject(msgInfo1, true, false, false, false);
+        if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Cannot find character " + msgInfo1);return;}
+        findObj.addCode(msg, msgInfo2);
+    }
     async saveAll(msg){
         if(this.checks(msg, true, false, true, true, false)===false){return;}
-            if(fs.existsSync('./csvs')===false){
-                try{await fs.mkdirSync('./csvs');}catch{this.utility.sendMsg(msg.channel, "ERROR: Folder /csvs/ does not exist and I can't create it, could you please make this folder and try again?"); return;}
-            }
-            if(fs.existsSync('./csvs/items.csv')){
-                try{fs.rename('./csvs/items.csv', './csvs/items_old.csv')}
-                catch{this.utility.sendMsg(msg.channel,"WARNING: file items.csv will overwrite any information saved to individual csv files. Please delete or rename this file to avoid overwriting any saved changes.")}
-            }
-            var headerList=[{id: 'name', title: "Name"}, {id: 'nickname', title: "Nickname"}, {id: 'cash', title: "Cash"}]
-            var itemCount=Math.max.apply(Math, this.characters.map(function(x) { return x.items.length; }));
-            var itemCount2=Math.max.apply(Math, this.locations.map(function(x) { return x.items.length; }));
-            if(itemCount2>itemCount){itemCount=itemCount2};
-             var charData=[];
-            for(var i=0;i<itemCount;i++){
-                headerList.push({id: 'item'+(i+1), title: "Item"+(i+1)});
-            }
-            for(var i=0;i<this.characters.length;i++){
-                charData.push(this.characters[i].save(msg, itemCount));
-            }
-            try{
-                var csvWriter = createCsvWriter({path: './csvs/characters.csv',header: headerList});
-                await csvWriter.writeRecords(charData).then(async ()=>{
-                    charData=[];
-                    for(var i=0;i<this.locations.length;i++){
-                        charData.push(this.locations[i].save(msg, itemCount));
-                    }
-                    try{
-                        var csvWriter = createCsvWriter({path: './csvs/locations.csv',header: headerList});
-                        await csvWriter.writeRecords(charData).then(()=> this.utility.sendMsg(msg.channel,"Records saved"));
-                    }catch{this.utility.sendMsg(msg.channel,"ERROR: Could not save to locations.csv, do you have it open?");}
-                });
-            }catch{this.utility.sendMsg(msg.channel,"ERROR: Could not save to characters.csv, do you have it open?");}
+        if(fs.existsSync('./csvs')===false){
+            try{await fs.mkdirSync('./csvs');}catch{this.utility.sendMsg(msg.channel, "ERROR: Folder /csvs/ does not exist and I can't create it, could you please make this folder and try again?"); return;}
+        }
+        await this.saveCharacters(msg);
+        await this.saveLocations(msg);
+        await this.saveItems(msg);
     }
-    nameExists(newName){
-        var exists=false;   newName=newName.toLowerCase();
-        if(newName==="" || newName==="locations" || newName==="characters" || newName==="items" || newName==="all"){exists=true;}
-        if(this.characters.find(x=>x.nameID.toLowerCase()===newName)){exists=true;}
-        if(this.locations.find(x=>x.nameID.toLowerCase()===newName)){exists=true;}
-        if(this.characters.find(x=>x.items.find(y=>y.nameID.toLowerCase()===newName))){exists=true;}
-        if(this.locations.find(x=>x.items.find(y=>y.nameID.toLowerCase()===newName))){exists=true;}
-        return exists;
+    async saveCharacters(msg){
+        var headerList=[{id: 'name', title: "Name"}, {id: 'nickname', title: "Nickname"}, {id: 'cash', title: "Cash"},{id: 'steal', title: "Steal"},{id: 'prevent', title: "Prevent"}]
+        var itemCount= Math.max.apply(Math, this.characters.map(function(x) { return x.items.length; })); 
+        var codeCount= Math.max.apply(Math, this.characters.map(function(x) { return x.itemCodes.length; }));
+        var charData=[]; 
+        for(var i=0;i<codeCount;i++){
+            headerList.push({id: 'code'+(i+1), title: "Code"+(i+1)});
+        }       
+        for(var i=0;i<itemCount;i++){
+            headerList.push({id: 'item'+(i+1), title: "Item"+(i+1)});
+        }
+        for(var i=0;i<this.characters.length;i++){
+            charData.push(this.characters[i].save(itemCount, codeCount));
+        }
+        try{
+            var csvWriter = createCsvWriter({path: './csvs/characters.csv',header: headerList});
+            await csvWriter.writeRecords(charData).then(()=> this.utility.sendMsg(msg.channel,"Characters.csv saved"));
+        }catch{this.utility.sendMsg(msg.channel,"ERROR: Could not save to characters.csv, do you have it open?");}
+    }
+    async saveLocations(msg){
+        var headerList=[{id: 'name', title: "Name"}, {id: 'description', title: "Description"}, {id: 'cash', title: "Cash"}]
+        var itemCount=Math.max.apply(Math, this.locations.map(function(x) { return x.items.length; }));
+        for(var i=0;i<itemCount;i++){
+            headerList.push({id: 'item'+(i+1), title: "Item"+(i+1)});
+        }
+        var charData=[];
+        for(var i=0;i<this.locations.length;i++){
+            charData.push(this.locations[i].save(itemCount, 0));
+        }
+        try{
+            var csvWriter = createCsvWriter({path: './csvs/locations.csv',header: headerList});
+            await csvWriter.writeRecords(charData).then(()=> this.utility.sendMsg(msg.channel,"Locations.csv saved"));
+        }catch{this.utility.sendMsg(msg.channel,"ERROR: Could not save to locations.csv, do you have it open?");}
+    }
+    async saveItems(msg){
+        var headerList=[{id: 'itemname', title: 'ItemName'},{id: 'heading', title: "Heading"}, {id: 'visible', title: "Visible"}, {id: 'text', title: "Text"}];
+        var itemData=[];
+        for(var i=0;i<this.characters.length;i++){
+            itemData=itemData.concat(this.characters[i].saveItems())
+        }
+        for(var i=0;i<this.locations.length;i++){
+            itemData=itemData.concat(this.locations[i].saveItems())
+        }
+        try{
+            var csvWriter = createCsvWriter({path: './csvs/items.csv',header: headerList});
+            await csvWriter.writeRecords(itemData).then(()=> this.utility.sendMsg(msg.channel,"Items.csv saved"));
+        }catch{this.utility.sendMsg(msg.channel,"ERROR: Could not save to items.csv, do you have it open?");}
+    }
+    nameExists(newName, ignoreOnce){
+        var firstExists=!ignoreOnce;    var firstObj=undefined;
+        newName=newName.toLowerCase();
+        if(newName==="" || newName==="locations" || newName==="characters" || newName==="items" || newName==="all" || newName==="cash" || newName==="abilities" || newName==="ability" ){return true;}
+        firstObj=this.characters.find(x=>x.nameID.toLowerCase()===newName);
+        if(firstObj){
+            if(firstExists){return true;}
+            else{ firstExists=true;  if(this.characters.find(x=>x.nameID.toLowerCase()===newName && x!==firstObj)){return true;}}
+        }
+        firstObj=this.locations.find(x=>x.nameID.toLowerCase()===newName);
+        if(firstObj){
+            if(firstExists){return true;}
+            else{ firstExists=true;  if(this.locations.find(x=>x.nameID.toLowerCase()===newName && x!==firstObj)){return true;}}
+        }
+        firstObj=this.characters.find(x=>x.items.find(y=>y.nameID.toLowerCase()===newName));
+        if(firstObj){
+            if(firstExists){return true;}
+            else{ firstExists=true; firstObj=firstObj.items.find(y=>y.nameID.toLowerCase()===newName);  
+                if(this.characters.find(x=>x.items.find(y=>y.nameID.toLowerCase()===newName && y!==firstObj))){return true;}
+            }
+        }
+        firstObj=this.locations.find(x=>x.items.find(y=>y.nameID.toLowerCase()===newName));
+        if(firstObj){
+            if(firstExists){return true;}
+            else{ firstExists=true; firstObj=firstObj.items.find(y=>y.nameID.toLowerCase()===newName);  
+                if(this.locations.find(x=>x.items.find(y=>y.nameID.toLowerCase()===newName && y!==firstObj))){return true;}
+            }
+        }       
+        return false;
+    }
+    findValidName(newName, count){
+        if(count===undefined){count=0;}
+        var newText = newName + ( count===0 ? "" : count);
+        if(!this.nameExists(newText)){return newText;}
+        else{return this.findValidName(newName, count+1);}
     }
 }
-
-//associate locations with a hidden channel/role?
-//Give characters specific abilities to read particular codes?->GM view codes to see all items with associated codes
-//Refactor error checks / finding item!
-//look into file encoding to see if possible to check which one first
