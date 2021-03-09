@@ -1,3 +1,3 @@
-Name,Nickname,Cash,Item1,Item2
-Jolly_Roger,Jolly_Roger,100,Flag,Chest
-Wendy_House,Wendy_House,0,bottle,
+Name,Description,Cash,Item1,Item2
+Jolly_Roger,"You are on a pirate ship, strangely devoid of pirates. It looks like they left in a hurry.",100,Flag,Chest
+Wendy_House,"You are inside a small underground house, built among the roots of a giant tree. It is simple and sparse, but feels homey and cheerful.",0,bottle,

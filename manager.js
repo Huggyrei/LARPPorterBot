@@ -169,6 +169,7 @@ module.exports = class GameManager{
             else{
                 for(var i=0;i<fileData.length;i++) {
                     var itemName=fileData[i].ItemName;
+                    if(typeof(itemName)==="string"){itemName=itemName.replace(" ", "_");}
                     var findObj = this.findObject(itemName, false, false, true, true);
                     if(findObj===undefined){
                         this.utility.sendMsg(msg.channel,"ERROR: Cannot find item " + itemName + ", adding it to default location 'GM'");
@@ -281,6 +282,7 @@ module.exports = class GameManager{
             if(findObj===undefined){this.utility.sendMsg(msg.channel, "Error: Canot find character " + msgInfo1); return;}
             msgInfo1=msgInfo2;
         }
+        if(msgInfo1.toLowerCase()==="gm"){this.utility.sendMsg(msg.channel, "Error: The GM location is for GMs only; characters cannot move there"); return;}
         var loc=this.findObject(msgInfo1, false, true, false, false);
         if(loc===undefined){this.utility.sendMsg(msg.channel, "Error: Canot find location " + msgInfo1); return;}
         findObj.move(msg, loc);
@@ -394,13 +396,15 @@ module.exports = class GameManager{
     }
     pay(msg, msgInfo1, msgInfo2, msgInfo3){
         var findObj = this.checks(msg, true, false, false, true, true);
+        var char2=undefined;
         if(findObj===false){return;}
         if(findObj===true){
             findObj=this.findObject(msgInfo1, true, true, false, false);
             if(findObj===undefined){this.utility.sendMsg(msg.channel,"ERROR: Specified character, location, or item not found"); return;}
             if(findObj.nameID.toLowerCase()!==msgInfo1.toLowerCase()){msgInfo3=msgInfo1;}   msgInfo1=msgInfo2;  msgInfo2=msgInfo3;
+            var char2=this.findObject(msgInfo1, true, true, false, false);
         }
-        var char2=this.findObject(msgInfo1, true, true, false, false);
+        else{char2=this.findObject(msgInfo1, true, false, false, false);}
         if(char2===undefined){this.utility.sendMsg(msg.channel,"Cannot find the character to pay the cash to"); return;}
         findObj.pay(msg, char2, msgInfo2);
     }

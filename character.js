@@ -15,24 +15,23 @@ module.exports = class Character
         var codeFlag=false;     
         for(var jObj in jsonIn){
             switch(jObj.toLowerCase()){
-                case 'name': this.nameID=jsonIn[jObj]; nameFound=true; break;
+                case 'name': this.nameID=typeof(jsonIn[jObj])==="string" ? jsonIn[jObj].replace(" ", "_") : jsonIn[jObj]; nameFound=true; break;
                 case 'nickname': case 'description': this.description=jsonIn[jObj]; break;
                 case 'cash': this.cash = typeof(jsonIn[jObj])==="string" ? Number(jsonIn[jObj].replace(/,/g, '')) : Number(jsonIn[jObj]); 
                     if(Number.isNaN(this.cash) || this.cash<0){this.cash=0; this.error=true; cashError=true;} break;
-                case 'steal': case 'theft': typeof(jsonIn[jObj])==="string" ? this.stealCount=Number(jsonIn[jObj].replace(/,/g, '')) : Number(jsonIn[jObj]);
+                case 'steal': case 'theft': this.stealCount = typeof(jsonIn[jObj])==="string" ? Number(jsonIn[jObj].replace(/,/g, '')) : Number(jsonIn[jObj]);
                     if(Number.isNaN(this.stealCount) || this.stealCount<0){this.stealCount=0; this.error=true; stealError=true;} 
                     this.stealCount=Math.floor(this.stealCount);   break;
-                case 'prevent': case 'stop': typeof(jsonIn[jObj])==="string" ? this.preventCount=Number(jsonIn[jObj].replace(/,/g, '')) : Number(jsonIn[jObj]);
+                case 'prevent': case 'stop': this.preventCount = typeof(jsonIn[jObj])==="string" ? Number(jsonIn[jObj].replace(/,/g, '')) : Number(jsonIn[jObj]);
                     if(Number.isNaN(this.preventCount) || this.preventCount<0){this.preventCount=0; this.error=true; preventError=true;} 
                     this.preventCount=Math.floor(this.preventCount);   break;
                 default:
                     if (jObj.toLowerCase().includes("code")){codeFlag=true;}
                     else if(jObj.toLowerCase().includes("item")){codeFlag=false;}
                     if(jsonIn[jObj]!=="" && jsonIn[jObj]!==null && jsonIn[jObj]!==undefined) {
-                        if(codeFlag){this.itemCodes.push(jsonIn[jObj]);}
-                        else{this.items.push(new Item(jsonIn[jObj], this.utility));
+                        if(codeFlag){this.itemCodes.push(typeof(jsonIn[jObj])==="string" ? jsonIn[jObj].replace(" ", "_") : jsonIn[jObj]);}
+                        else{this.items.push(new Item(jsonIn[jObj], this.utility));}
                     }
-                }
             }
         }
         if(nameFound===false){this.index=_index; this.error=true; this.utility.sendMsg(msg.channel,"Character name not found for character " + _index);}

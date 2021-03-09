@@ -2,6 +2,7 @@
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 module.exports = class Item{
     constructor(name, utility){
+        if(typeof(name)==="string"){name=name.replace(" ", "_");}
         this.nameID=name;   this.infos=[];  this.utility=utility;
     }
     loadFileData(msg, jsonIn){
@@ -17,7 +18,7 @@ module.exports = class Item{
         var infoItem={heading:"", visible:true, text: ""};
         for(var jObj in dataItem){
             switch(jObj.toLowerCase()){
-                case 'name': case 'title': case 'heading': case 'section': infoItem.heading=dataItem[jObj]; break;
+                case 'name': case 'title': case 'heading': case 'section': infoItem.heading=typeof(dataItem[jObj])==="string" ? dataItem[jObj].replace(" ", "_") : dataItem[jObj]; break;
                 case 'visible': case 'visibility': case 'visible?': case 'public' : 
                     var firstChar = dataItem[jObj].toLowerCase().substring(0,1);
                         infoItem.visible=(firstChar==="y"||firstChar==="t")?true:false; break
