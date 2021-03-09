@@ -45,13 +45,13 @@ While it is possible to set up your game using the bot commands, you will likely
     
     The 'Name' field contains an ID tag associated with the character. Note that these must be unique and without spaces. 'Nickname' is the long name; the bot will switch users' nicknames on the server to match. 'Cash' is the amount of money the character has at the start of the game. 'Steal' indicates the number of times the character can use the stealing ability. Similarly, 'Prevent' is the number of times a character is able to choose to thwart a theft attempt against them. The 'Code' fields indicate which hidden information the character has access to; for example, if they have an item called 'Map' which contains hidden invisible under the title 'Rum', then the character is only able to view that if they have access to the 'Rum' code. You can have as many Code fields as you like. The 'Item' fields are the ID names of the items that the character is carrying. These need to match up with the item names used in the items.csv file. As with the character name, the item name must contain no spaces, and must be unique. Items, characters, and locations must also be unique from each other. As with the codes, you can have as many 'Item' columns as you need.
 
-2.   _**\locations.csv**_ This file contains the information for the locations. The fields are:
+2.   _**locations.csv**_ This file contains the information for the locations. The fields are:
                 
          Name    Description     Cash    Item1   Item2   ...
      
      As with the characters file, the 'Name' field contains the location's ID. This must be unique (and unique from te character and item names) and without spaces. 'Description' is a field for text about the location; this will be posted to the top of the location channel so that players can see it if they move there during the game. 'Cash' indicates the amount of cash that is in this location at the start of the game. The 'Item' fields contain the ID names of the items that are in the location at the start of the game. As with the characters file, the Item columns can extend for as many columns as necessary, and must match the ID names in the items.csv file. Item names must be unique and contain no spaces. Note that the only location characters can't move to is one named 'GM'; hidden items can be stored here until the GM wants to allocate them during the game.
 
-3.  _**\items.csv**_ This file contains the information associated with the items. The fields are:
+3.  _**items.csv**_ This file contains the information associated with the items. The fields are:
         
           ItemName    Heading     Visible     Text
     
